@@ -46,6 +46,10 @@
   .logo { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
   .logo span { color: var(--accent); }
   .logo-sub { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .random-btn { background: transparent; border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 18px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; margin-left: auto; transition: border-color 0.15s, background 0.15s, transform 0.1s; }
+  .random-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .random-btn:active { transform: scale(0.97); }
+  .random-btn:disabled { opacity: 0.4; cursor: default; }
 
   /* API Key */
   .api-bar {
@@ -226,6 +230,31 @@
   .t-ghost { background: #512DA8; color: #fff; }
   .t-steel { background: #90A4AE; color: #000; }
   .t-fairy { background: #F48FB1; color: #000; }
+
+  /* Ranking tool */
+  .rank-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+  .rank-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
+  .rank-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 130px; }
+  .rank-group label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .rank-group select, .rank-group input[type=number] { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px; outline: none; transition: border-color 0.15s; }
+  .rank-group select:focus, .rank-group input[type=number]:focus { border-color: var(--accent); }
+  .rank-group select option { background: var(--surface2); }
+  .rank-btn { background: var(--accent); color: #0a0a0f; border: none; border-radius: 8px; padding: 10px 24px; font-size: 14px; font-weight: 800; cursor: pointer; font-family: 'Syne', sans-serif; white-space: nowrap; transition: opacity 0.15s, transform 0.1s; align-self: flex-end; }
+  .rank-btn:hover { opacity: 0.85; }
+  .rank-btn:active { transform: scale(0.97); }
+  .rank-btn:disabled { opacity: 0.4; cursor: default; }
+  .rank-progress { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); margin-bottom: 0.75rem; display: none; }
+  .rank-table { width: 100%; border-collapse: collapse; }
+  .rank-table th { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+  .rank-table td { padding: 8px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  .rank-table tr:last-child td { border-bottom: none; }
+  .rank-pos { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); width: 30px; }
+  .rank-sprite { width: 48px; height: 48px; image-rendering: pixelated; }
+  .rank-name { text-transform: capitalize; font-weight: 600; }
+  .rank-stat-val { font-family: 'Space Mono', monospace; font-size: 14px; font-weight: 700; color: var(--accent); }
+  .rank-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .rank-bar-bg { flex: 1; height: 5px; background: var(--surface2); border-radius: 3px; overflow: hidden; min-width: 60px; }
+  .rank-bar-fill { height: 5px; border-radius: 3px; background: var(--accent); }
 </style>
 </head>
 <body>
@@ -235,6 +264,7 @@
       <div class="logo">Poké<span>MCP</span></div>
       <div class="logo-sub">MCP Server Explorer</div>
     </div>
+    <button class="random-btn" id="randomBtn" onclick="runRandom()" title="Random Pokémon">&#x1F3B2; Random</button>
   </header>
 
   <div class="api-bar">
@@ -251,6 +281,21 @@
   </div>
 
   <div class="chat-divider"><span>or use a specific tool</span></div>
+
+  <div class="rank-panel">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem"><span style="font-size:18px">🏆</span><span style="font-size:15px;font-weight:600">Pokémon Ranking</span><span style="font-family:Space Mono,monospace;font-size:10px;color:var(--muted);margin-left:4px">via PokéAPI — free, no tokens used</span></div>
+    <div class="rank-controls">
+      <div class="rank-group"><label>Stat</label><select id="rankStat"><option value="speed">Speed</option><option value="attack">Attack</option><option value="defense">Defense</option><option value="hp">HP</option><option value="special-attack">Sp. Attack</option><option value="special-defense">Sp. Defense</option><option value="total">Total Base Stats</option></select></div>
+      <div class="rank-group"><label>Order</label><select id="rankOrder"><option value="desc">Highest first</option><option value="asc">Lowest first</option></select></div>
+      <div class="rank-group"><label>Generation</label><select id="rankGen"><option value="all">All generations</option><option value="1">Gen 1 — Kanto</option><option value="2">Gen 2 — Johto</option><option value="3">Gen 3 — Hoenn</option><option value="4">Gen 4 — Sinnoh</option><option value="5">Gen 5 — Unova</option><option value="6">Gen 6 — Kalos</option><option value="7">Gen 7 — Alola</option><option value="8">Gen 8 — Galar</option><option value="9">Gen 9 — Paldea</option></select></div>
+      <div class="rank-group"><label>Type filter</label><select id="rankType"><option value="all">All types</option><option value="normal">Normal</option><option value="fire">Fire</option><option value="water">Water</option><option value="grass">Grass</option><option value="electric">Electric</option><option value="ice">Ice</option><option value="fighting">Fighting</option><option value="poison">Poison</option><option value="ground">Ground</option><option value="flying">Flying</option><option value="psychic">Psychic</option><option value="bug">Bug</option><option value="rock">Rock</option><option value="ghost">Ghost</option><option value="dragon">Dragon</option><option value="dark">Dark</option><option value="steel">Steel</option><option value="fairy">Fairy</option></select></div>
+      <div class="rank-group" style="max-width:100px"><label>Show top</label><input type="number" id="rankLimit" value="10" min="1" max="100" /></div>
+      <button class="rank-btn" id="rankBtn" onclick="runRanking()">Rank &#x2192;</button>
+    </div>
+    <div class="rank-progress" id="rankProgress"></div>
+    <div id="rankResults"></div>
+  </div>
+
 
   <div class="tools-label">12 tools available</div>
   <div class="tool-grid" id="toolGrid"></div>
@@ -589,6 +634,106 @@ async function runChat() {
     ri.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
   btn.disabled=false; btn.textContent='Ask →';
+}
+
+
+async function runRandom() {
+  const btn = document.getElementById('randomBtn');
+  btn.disabled = true; btn.textContent = '... Rolling';
+  const rp = document.getElementById('resultPanel');
+  const ri = document.getElementById('resultInner');
+  rp.classList.add('visible');
+  ri.innerHTML = '<span class="spinner"></span>Finding a random Pokemon...';
+  document.querySelectorAll('.tool-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('inputPanel').classList.remove('visible');
+  try {
+    const id = Math.floor(Math.random() * 1025) + 1;
+    const res = await fetch('https://pokeapi.co/api/v2/pokemon/' + id);
+    const p = await res.json();
+    const types = p.types.map(t => t.type.name);
+    const stats = {};
+    p.stats.forEach(s => {
+      const key = s.stat.name.replace('special-attack','sp_attack').replace('special-defense','sp_defense');
+      stats[key] = s.base_stat;
+    });
+    const d = {
+      type: 'stats',
+      name: p.name,
+      number: p.id,
+      types: types,
+      height: (p.height / 10).toFixed(1) + 'm',
+      weight: (p.weight / 10).toFixed(1) + 'kg',
+      stats: stats
+    };
+    ri.innerHTML = renderResult(d);
+    document.getElementById('resultHead').textContent = '🎲 Random Pokemon — #' + String(p.id).padStart(3,'0');
+  } catch(e) {
+    ri.innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+  }
+  btn.disabled = false; btn.textContent = '🎲 Random';
+}
+
+async function runRanking() {
+  const stat = document.getElementById('rankStat').value;
+  const order = document.getElementById('rankOrder').value;
+  const gen = document.getElementById('rankGen').value;
+  const typeFilter = document.getElementById('rankType').value;
+  const limit = Math.min(100, Math.max(1, parseInt(document.getElementById('rankLimit').value) || 10));
+  const btn = document.getElementById('rankBtn');
+  const progress = document.getElementById('rankProgress');
+  const results = document.getElementById('rankResults');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  progress.style.display = 'block';
+  results.innerHTML = '';
+  try {
+    let pokemonList = [];
+    if(gen === 'all') {
+      progress.textContent = 'Fetching all Pokemon...';
+      const res = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1025');
+      const data = await res.json();
+      pokemonList = data.results.map(p => p.name);
+    } else {
+      progress.textContent = 'Fetching Gen ' + gen + ' Pokemon...';
+      const res = await fetch('https://pokeapi.co/api/v2/generation/' + gen);
+      const data = await res.json();
+      pokemonList = data.pokemon_species.map(p => p.name);
+    }
+    progress.textContent = 'Fetching stats for ' + pokemonList.length + ' Pokemon...';
+    const BATCH = 50;
+    let allStats = [];
+    for(let i = 0; i < pokemonList.length; i += BATCH) {
+      const batch = pokemonList.slice(i, i + BATCH);
+      const batchResults = await Promise.all(
+        batch.map(name => fetch('https://pokeapi.co/api/v2/pokemon/' + name).then(r => r.json()).catch(() => null))
+      );
+      allStats = allStats.concat(batchResults.filter(Boolean));
+      progress.textContent = 'Fetched ' + Math.min(i + BATCH, pokemonList.length) + ' / ' + pokemonList.length + '...';
+    }
+    if(typeFilter !== 'all') {
+      allStats = allStats.filter(p => p.types && p.types.some(t => t.type.name === typeFilter));
+    }
+    function getStatVal(p) {
+      if(stat === 'total') return p.stats.reduce((sum, s) => sum + s.base_stat, 0);
+      const s = p.stats.find(s => s.stat.name === stat);
+      return s ? s.base_stat : 0;
+    }
+    allStats.sort((a, b) => order === 'desc' ? getStatVal(b) - getStatVal(a) : getStatVal(a) - getStatVal(b));
+    const top = allStats.slice(0, limit);
+    const statLabel = stat === 'total' ? 'Total' : stat.replace('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const typeStr = typeFilter !== 'all' ? ' - ' + typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1) + ' type' : '';
+    const genStr = gen !== 'all' ? ' - Gen ' + gen : '';
+    progress.textContent = 'Showing top ' + top.length + ' by ' + statLabel + typeStr + genStr;
+    results.innerHTML = '<table class="rank-table"><thead><tr><th>#</th><th></th><th>Pokemon</th><th>Types</th><th>' + statLabel + '</th><th></th></tr></thead><tbody>' +
+      top.map(function(p, i) {
+        const val = getStatVal(p);
+        const pct = Math.round((val / (stat === 'total' ? 720 : 255)) * 100);
+        const types = p.types.map(function(t) { return '<span class="type-badge t-' + t.type.name + '">' + t.type.name + '</span>'; }).join(' ');
+        return '<tr><td class="rank-pos">' + (i+1) + '</td><td><img class="rank-sprite" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + p.id + '.png" alt="" onerror="this.style.display=\'none\'" /></td><td class="rank-name">' + p.name + '</td><td>' + types + '</td><td class="rank-stat-val">' + val + '</td><td style="min-width:80px"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:' + pct + '%"></div></div></td></tr>';
+      }).join('') + '</tbody></table>';
+  } catch(e) {
+    results.innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+  }
+  btn.disabled = false; btn.textContent = 'Rank \u2192';
 }
 
 renderTools();
