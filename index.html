@@ -67,6 +67,31 @@
   }
   .save-btn:hover { opacity: 0.85; }
 
+  /* Chat prompt */
+  .chat-bar {
+    display: flex; gap: 8px; margin-bottom: 2rem; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 14px; transition: border-color 0.15s;
+  }
+  .chat-bar:focus-within { border-color: rgba(232,255,71,0.4); }
+  .chat-bar input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'Syne', sans-serif; font-size: 14px;
+  }
+  .chat-bar input::placeholder { color: var(--muted); }
+  .chat-btn {
+    background: var(--accent); color: #0a0a0f; border: none; border-radius: 8px;
+    padding: 8px 18px; font-size: 13px; font-weight: 800; cursor: pointer;
+    font-family: 'Syne', sans-serif; white-space: nowrap;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .chat-btn:hover { opacity: 0.85; }
+  .chat-btn:active { transform: scale(0.97); }
+  .chat-btn:disabled { opacity: 0.4; cursor: default; }
+  .chat-divider { display: flex; align-items: center; gap: 10px; margin-bottom: 1.25rem; }
+  .chat-divider span { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; white-space: nowrap; }
+  .chat-divider::before, .chat-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
   /* Tool grid */
   .tools-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
   .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px; margin-bottom: 2rem; }
@@ -174,6 +199,8 @@
   .enc-item { background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 5px 0; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
   .enc-loc { text-transform: capitalize; }
   .enc-ver { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+  .sprite { image-rendering: pixelated; width: 96px; height: 96px; object-fit: contain; }
+  .sprite-lg { image-rendering: pixelated; width: 120px; height: 120px; object-fit: contain; }
   .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--surface2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .error { color: var(--accent2); font-family: 'Space Mono', monospace; font-size: 13px; }
@@ -217,6 +244,14 @@
   </div>
   <div class="notice" id="keyNotice">API key saved for this session.</div>
 
+
+  <div class="chat-bar">
+    <input type="text" id="chatInput" placeholder="Ask anything — what are pikachus stats, compare mewtwo and gengar, fire type weaknesses..." />
+    <button class="chat-btn" id="chatBtn" onclick="runChat()">Ask &rarr;</button>
+  </div>
+
+  <div class="chat-divider"><span>or use a specific tool</span></div>
+
   <div class="tools-label">12 tools available</div>
   <div class="tool-grid" id="toolGrid"></div>
 
@@ -259,19 +294,19 @@ When asked about a Pokémon's stats, return:
 {"type":"stats","name":"...","number":N,"types":["..."],"height":"...","weight":"...","stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}}
 
 When asked about moves for a Pokémon, return:
-{"type":"moves","name":"...","moves":["move1","move2",...]}
+{"type":"moves","name":"...","number":N,"moves":["move1","move2",...]}
 
 When asked about abilities, return:
-{"type":"abilities","name":"...","abilities":[{"name":"...","hidden":false},...]}
+{"type":"abilities","name":"...","number":N,"abilities":[{"name":"...","hidden":false},...]}
 
 When asked about evolution chain, return:
 {"type":"evolution","chain":["mon1","mon2","mon3"]}
 
 When asked about encounters/locations, return:
-{"type":"encounters","name":"...","encounters":[{"location":"...","version":"..."},...]}
+{"type":"encounters","name":"...","number":N,"encounters":[{"location":"...","version":"..."},...]}
 
 When asked to compare two Pokémon, return:
-{"type":"compare","p1":{"name":"...","types":["..."],"stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}},"p2":{"name":"...","types":["..."],"stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}}}
+{"type":"compare","p1":{"name":"...","number":N,"types":["..."],"stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}},"p2":{"name":"...","number":N,"types":["..."],"stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}}}
 
 When asked about type matchups, return:
 {"type":"type_matchups","type_name":"...","double_damage_to":["..."],"half_damage_to":["..."],"no_damage_to":["..."],"double_damage_from":["..."],"half_damage_from":["..."],"no_damage_from":["..."]}
@@ -397,9 +432,16 @@ function statBars(stats) {
   }).join('');
 }
 
+function sprite(id, large) {
+  if(!id || id==='?') return '';
+  const cls = large ? 'sprite-lg' : 'sprite';
+  return `<img class="${cls}" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png" alt="" onerror="this.style.display='none'" />`;
+}
+
 function renderResult(d) {
   if(d.type==='stats') {
     return `<div class="poke-header">
+      ${sprite(d.number, true)}
       <div>
         <div class="poke-num">#${String(d.number||'?').padStart(3,'0')}</div>
         <div class="poke-name">${d.name}</div>
@@ -411,11 +453,17 @@ function renderResult(d) {
     <div class="stat-rows">${statBars(d.stats)}</div>`;
   }
   if(d.type==='moves') {
-    return `<div class="poke-name" style="margin-bottom:0.75rem;font-size:16px;text-transform:capitalize">${d.name} — ${d.moves.length} moves</div>
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:0.75rem">
+      ${sprite(d.number)}
+      <div class="poke-name" style="font-size:16px;text-transform:capitalize">${d.name} — ${d.moves.length} moves</div>
+    </div>
     <div class="move-grid">${d.moves.map(m=>`<div class="move-item">${m}</div>`).join('')}</div>`;
   }
   if(d.type==='abilities') {
-    return `<div class="poke-name" style="margin-bottom:0.75rem;font-size:16px;text-transform:capitalize">${d.name}</div>
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:0.75rem">
+      ${sprite(d.number)}
+      <div class="poke-name" style="font-size:16px;text-transform:capitalize">${d.name}</div>
+    </div>
     <div class="tag-cloud">${d.abilities.map(a=>`<span class="tag ${a.hidden?'hidden':'ability'}">${a.name}${a.hidden?' (hidden)':''}</span>`).join('')}</div>`;
   }
   if(d.type==='evolution') {
@@ -423,22 +471,29 @@ function renderResult(d) {
     <div class="evo-chain">${d.chain.map((m,i)=>`${i>0?'<span class="evo-arrow">→</span>':''}<span class="evo-mon">${m}</span>`).join('')}</div>`;
   }
   if(d.type==='encounters') {
-    if(!d.encounters||!d.encounters.length) return `<div class="muted" style="color:var(--muted)">No wild encounter data found for ${d.name}.</div>`;
-    return `<div class="poke-name" style="margin-bottom:0.75rem;font-size:16px;text-transform:capitalize">${d.name} encounters</div>
+    if(!d.encounters||!d.encounters.length) return `<div style="color:var(--muted)">No wild encounter data found for ${d.name}.</div>`;
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:0.75rem">
+      ${sprite(d.number)}
+      <div class="poke-name" style="font-size:16px;text-transform:capitalize">${d.name} encounters</div>
+    </div>
     ${d.encounters.slice(0,20).map(e=>`<div class="enc-item"><span class="enc-loc">${e.location}</span><span class="enc-ver">${e.version}</span></div>`).join('')}`;
   }
   if(d.type==='compare') {
     const p1=d.p1, p2=d.p2;
-    const keys=['hp','attack','defense','sp_attack','sp_defense','speed'];
-    const labels=['HP','ATK','DEF','SP.ATK','SP.DEF','SPD'];
     return `<div class="compare-grid">
       <div>
-        <div class="compare-name">${p1.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          ${sprite(p1.number)}
+          <div class="compare-name">${p1.name}</div>
+        </div>
         <div class="types" style="margin-bottom:8px">${(p1.types||[]).map(typeBadge).join('')}</div>
         ${statBars(p1.stats)}
       </div>
       <div>
-        <div class="compare-name">${p2.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+          ${sprite(p2.number)}
+          <div class="compare-name">${p2.name}</div>
+        </div>
         <div class="types" style="margin-bottom:8px">${(p2.types||[]).map(typeBadge).join('')}</div>
         ${statBars(p2.stats)}
       </div>
@@ -494,7 +549,45 @@ function renderResult(d) {
   return `<pre style="font-size:12px;color:var(--muted);white-space:pre-wrap">${JSON.stringify(d,null,2)}</pre>`;
 }
 
+async function runChat() {
+  const input = document.getElementById('chatInput');
+  const prompt = input.value.trim();
+  if(!prompt) return;
+  const key = getKey();
+  if(!key) { alert('Please enter your Anthropic API key first.'); return; }
+  const btn = document.getElementById('chatBtn');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  const rp = document.getElementById('resultPanel');
+  const ri = document.getElementById('resultInner');
+  rp.classList.add('visible');
+  ri.innerHTML = '<span class="spinner"></span>Fetching data...';
+  document.querySelectorAll('.tool-card').forEach(c=>c.classList.remove('active'));
+  activeTool = null;
+  document.getElementById('inputPanel').classList.remove('visible');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({model:'claude-haiku-4-5-20251001', max_tokens:2000, system:SYSTEM, messages:[{role:'user',content:prompt}]})
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error?.message||'API error');
+    const text = data.content.map(b=>b.text||'').join('');
+    const json = JSON.parse(text.replace(/```json|```/g,'').trim());
+    ri.innerHTML = renderResult(json);
+    document.getElementById('resultHead').textContent = '💬 ' + prompt;
+  } catch(e) {
+    ri.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+  btn.disabled=false; btn.textContent='Ask →';
+}
+
 renderTools();
+
+// wire up Enter key for chat input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('chatInput').addEventListener('keydown', e => { if(e.key==='Enter') runChat(); });
+});
 
 // restore key
 const saved = sessionStorage.getItem('poke_api_key');
