@@ -331,6 +331,7 @@ const tools = [
 ];
 
 let activeTool = null;
+let lastPokemon = null;
 
 // Build tool system prompts
 const SYSTEM = `You are a Pokémon data assistant with access to the PokéAPI. Answer ONLY in JSON, no markdown, no explanation.
@@ -416,6 +417,7 @@ function selectTool(id) {
   document.getElementById('card-'+id).classList.add('active');
   document.getElementById('panelIcon').textContent = activeTool.icon;
   document.getElementById('panelTitle').textContent = activeTool.name;
+  const singlePokeTools = ['stats','moves','abilities','encounters','evolution'];
   document.getElementById('fieldsRow').innerHTML = activeTool.fields.map(f=>`
     <div class="field-group">
       <label>${f.label}</label>
@@ -423,7 +425,13 @@ function selectTool(id) {
     </div>`).join('')+`<button class="run-btn" id="runBtn" onclick="runTool()">Run →</button>`;
   document.getElementById('inputPanel').classList.add('visible');
   document.getElementById('resultPanel').classList.remove('visible');
-  setTimeout(()=>document.getElementById('f-'+activeTool.fields[0].id).focus(),50);
+  // If we have a last pokemon and this tool uses a single pokemon name, pre-fill and auto-run
+  if(lastPokemon && singlePokeTools.includes(id)) {
+    document.getElementById('f-name').value = lastPokemon;
+    runTool();
+  } else {
+    setTimeout(()=>document.getElementById('f-'+activeTool.fields[0].id).focus(),50);
+  }
 }
 
 async function runTool() {
@@ -449,7 +457,10 @@ async function runTool() {
     if(!res.ok) throw new Error(data.error?.message||'API error');
     const text = data.content.map(b=>b.text||'').join('');
     const json = JSON.parse(text.replace(/```json|```/g,'').trim());
-    try { ri.innerHTML = renderResult(json); } catch(re) { ri.innerHTML = `<div class="error">Could not display result. The response may be an unsupported query type.</div>`; }
+    try {
+      ri.innerHTML = renderResult(json);
+      if(['stats','moves','abilities','encounters','evolution'].includes(json.type) && json.name) lastPokemon = json.name;
+    } catch(re) { ri.innerHTML = `<div class="error">Could not display result. The response may be an unsupported query type.</div>`; }
   } catch(e) {
     ri.innerHTML = `<div class="error">Error: ${e.message}</div>`;
   }
@@ -628,7 +639,10 @@ async function runChat() {
     if(!res.ok) throw new Error(data.error?.message||'API error');
     const text = data.content.map(b=>b.text||'').join('');
     const json = JSON.parse(text.replace(/```json|```/g,'').trim());
-    try { ri.innerHTML = renderResult(json); } catch(re) { ri.innerHTML = `<div class="error">Could not display result. The response may be an unsupported query type.</div>`; }
+    try {
+      ri.innerHTML = renderResult(json);
+      if(['stats','moves','abilities','encounters','evolution'].includes(json.type) && json.name) lastPokemon = json.name;
+    } catch(re) { ri.innerHTML = `<div class="error">Could not display result. The response may be an unsupported query type.</div>`; }
     document.getElementById('resultHead').textContent = '💬 ' + prompt;
   } catch(e) {
     ri.innerHTML = `<div class="error">Error: ${e.message}</div>`;
@@ -666,6 +680,7 @@ async function runRandom() {
       stats: stats
     };
     ri.innerHTML = renderResult(d);
+    lastPokemon = p.name;
     document.getElementById('resultHead').textContent = '🎲 Random Pokemon — #' + String(p.id).padStart(3,'0');
   } catch(e) {
     ri.innerHTML = '<div class="error">Error: ' + e.message + '</div>';
@@ -728,7 +743,7 @@ async function runRanking() {
         const val = getStatVal(p);
         const pct = Math.round((val / (stat === 'total' ? 720 : 255)) * 100);
         const types = p.types.map(function(t) { return '<span class="type-badge t-' + t.type.name + '">' + t.type.name + '</span>'; }).join(' ');
-        return '<tr><td class="rank-pos">' + (i+1) + '</td><td><img class="rank-sprite" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + p.id + '.png" alt="" onerror="this.style.display=\'none\'" /></td><td class="rank-name">' + p.name + '</td><td>' + types + '</td><td class="rank-stat-val">' + val + '</td><td style="min-width:80px"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:' + pct + '%"></div></div></td></tr>';
+        return '<tr style="cursor:pointer" onclick="lastPokemon=\'' + p.name + '\';document.getElementById(\'card-stats\').scrollIntoView({behavior:\'smooth\'});selectTool(\'stats\')" title="Click to look up ' + p.name + '"><td class="rank-pos">' + (i+1) + '</td><td><img class="rank-sprite" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/' + p.id + '.png" alt="" onerror="this.style.display=\'none\'" /></td><td class="rank-name">' + p.name + '</td><td>' + types + '</td><td class="rank-stat-val">' + val + '</td><td style="min-width:80px"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:' + pct + '%"></div></div></td></tr>';
       }).join('') + '</tbody></table>';
   } catch(e) {
     results.innerHTML = '<div class="error">Error: ' + e.message + '</div>';
