@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pokédex MCP Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c28;
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.15);
+    --text: #f0f0f5;
+    --muted: #7a7a8a;
+    --accent: #e8ff47;
+    --accent2: #ff6b47;
+    --accent3: #47c9ff;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  /* bg grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+  /* Header */
+  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 2.5rem; }
+  .logo { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+  .logo span { color: var(--accent); }
+  .logo-sub { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  /* API Key */
+  .api-bar {
+    display: flex; gap: 8px; margin-bottom: 2rem; align-items: center;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px 12px;
+  }
+  .api-bar label { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .api-bar input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'Space Mono', monospace; font-size: 12px;
+  }
+  .api-bar input::placeholder { color: var(--muted); }
+  .save-btn {
+    background: var(--accent); color: #0a0a0f; border: none; border-radius: 6px;
+    padding: 5px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+    font-family: 'Syne', sans-serif; letter-spacing: 0.05em;
+    transition: opacity 0.15s;
+  }
+  .save-btn:hover { opacity: 0.85; }
+
+  /* Tool grid */
+  .tools-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.75rem; }
+  .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px; margin-bottom: 2rem; }
+  .tool-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    position: relative; overflow: hidden;
+  }
+  .tool-card::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, transparent 60%);
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .tool-card:hover { border-color: var(--border-hover); transform: translateY(-1px); }
+  .tool-card:hover::after { opacity: 0.04; }
+  .tool-card.active { border-color: var(--accent); background: var(--surface2); }
+  .tool-card.active::after { opacity: 0.06; }
+  .t-icon { font-size: 22px; margin-bottom: 8px; }
+  .t-name { font-size: 13px; font-weight: 600; color: var(--text); }
+  .t-desc { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+
+  /* Input panel */
+  .input-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem;
+    display: none;
+  }
+  .input-panel.visible { display: block; }
+  .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+  .panel-icon { font-size: 20px; }
+  .panel-title { font-size: 16px; font-weight: 600; }
+  .fields-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .field-group { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 150px; }
+  .field-group label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .field-group input, .field-group select {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 12px; color: var(--text);
+    font-family: 'Syne', sans-serif; font-size: 14px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .field-group input:focus, .field-group select:focus { border-color: var(--accent); }
+  .field-group input::placeholder { color: var(--muted); }
+  .field-group select option { background: var(--surface2); }
+  .run-btn {
+    background: var(--accent); color: #0a0a0f; border: none; border-radius: 8px;
+    padding: 10px 24px; font-size: 14px; font-weight: 800; cursor: pointer;
+    font-family: 'Syne', sans-serif; letter-spacing: 0.03em;
+    transition: opacity 0.15s, transform 0.1s; white-space: nowrap;
+  }
+  .run-btn:hover { opacity: 0.85; }
+  .run-btn:active { transform: scale(0.97); }
+  .run-btn:disabled { opacity: 0.4; cursor: default; }
+
+  /* Result */
+  .result-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.25rem; display: none;
+  }
+  .result-panel.visible { display: block; }
+  .result-head { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 1rem; }
+  .result-inner { font-size: 14px; line-height: 1.8; }
+
+  /* Result components */
+  .poke-header { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .poke-num { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); }
+  .poke-name { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; text-transform: capitalize; }
+  .poke-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .types { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem; }
+  .type-badge {
+    font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+  }
+  .stat-rows { margin-bottom: 0.5rem; }
+  .stat-row { display: flex; align-items: center; gap: 10px; margin: 7px 0; }
+  .stat-lbl { font-family: 'Space Mono', monospace; font-size: 11px; color: var(--muted); width: 90px; flex-shrink: 0; }
+  .stat-bar-bg { flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; }
+  .stat-fill { height: 6px; border-radius: 3px; transition: width 0.6s ease; }
+  .stat-val { font-family: 'Space Mono', monospace; font-size: 12px; width: 32px; text-align: right; color: var(--text); }
+  .section-title { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin: 1rem 0 0.5rem; }
+  .tag-cloud { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+    padding: 4px 10px; font-size: 12px; color: var(--muted); text-transform: capitalize;
+  }
+  .tag.ability { color: var(--accent3); border-color: rgba(71,201,255,0.2); background: rgba(71,201,255,0.06); }
+  .tag.hidden { color: var(--accent2); border-color: rgba(255,107,71,0.2); background: rgba(255,107,71,0.06); }
+  .evo-chain { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .evo-mon { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600; text-transform: capitalize; }
+  .evo-arrow { color: var(--muted); font-size: 18px; }
+  .move-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 5px; }
+  .move-item { background: var(--surface2); border-radius: 6px; padding: 5px 9px; font-size: 12px; text-transform: capitalize; color: var(--muted); cursor: pointer; transition: color 0.15s, border-color 0.15s; border: 1px solid transparent; }
+  .move-item:hover { color: var(--accent); border-color: rgba(232,255,71,0.2); }
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .compare-name { font-size: 16px; font-weight: 700; text-transform: capitalize; margin-bottom: 8px; }
+  .matchup-row { margin-bottom: 10px; }
+  .matchup-label { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 5px; }
+  .gen-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; }
+  .gen-item { background: var(--surface2); border-radius: 6px; padding: 5px 10px; font-size: 12px; text-transform: capitalize; color: var(--muted); cursor: pointer; transition: color 0.15s; }
+  .gen-item:hover { color: var(--accent); }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .info-row { display: flex; flex-direction: column; gap: 2px; }
+  .info-lbl { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; }
+  .info-val { font-size: 14px; font-weight: 600; text-transform: capitalize; }
+  .enc-item { background: var(--surface2); border-radius: 8px; padding: 8px 12px; margin: 5px 0; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+  .enc-loc { text-transform: capitalize; }
+  .enc-ver { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--surface2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { color: var(--accent2); font-family: 'Space Mono', monospace; font-size: 13px; }
+  .notice { background: rgba(232,255,71,0.06); border: 1px solid rgba(232,255,71,0.15); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--accent); margin-bottom: 1rem; display: none; }
+  .notice.visible { display: block; }
+
+  /* Type colors */
+  .t-normal { background: #9EA0A0; color: #fff; }
+  .t-fire { background: #FF6B35; color: #fff; }
+  .t-water { background: #3B9EDB; color: #fff; }
+  .t-grass { background: #4CAF50; color: #fff; }
+  .t-electric { background: #F9CF30; color: #000; }
+  .t-psychic { background: #EC407A; color: #fff; }
+  .t-ice { background: #80DEEA; color: #000; }
+  .t-dragon { background: #7B68EE; color: #fff; }
+  .t-dark { background: #5D4037; color: #fff; }
+  .t-fighting { background: #BF360C; color: #fff; }
+  .t-poison { background: #9C27B0; color: #fff; }
+  .t-ground { background: #D4A017; color: #000; }
+  .t-flying { background: #90CAF9; color: #000; }
+  .t-bug { background: #8BC34A; color: #000; }
+  .t-rock { background: #A1887F; color: #fff; }
+  .t-ghost { background: #512DA8; color: #fff; }
+  .t-steel { background: #90A4AE; color: #000; }
+  .t-fairy { background: #F48FB1; color: #000; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="logo">Poké<span>MCP</span></div>
+      <div class="logo-sub">MCP Server Explorer</div>
+    </div>
+  </header>
+
+  <div class="api-bar">
+    <label>ANTHROPIC API KEY</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-..." />
+    <button class="save-btn" onclick="saveKey()">Save</button>
+  </div>
+  <div class="notice" id="keyNotice">API key saved for this session.</div>
+
+  <div class="tools-label">12 tools available</div>
+  <div class="tool-grid" id="toolGrid"></div>
+
+  <div class="input-panel" id="inputPanel">
+    <div class="panel-head">
+      <span class="panel-icon" id="panelIcon"></span>
+      <span class="panel-title" id="panelTitle"></span>
+    </div>
+    <div class="fields-row" id="fieldsRow"></div>
+  </div>
+
+  <div class="result-panel" id="resultPanel">
+    <div class="result-head" id="resultHead">Result</div>
+    <div class="result-inner" id="resultInner"></div>
+  </div>
+</div>
+
+<script>
+const tools = [
+  { id:'stats',      icon:'📊', name:'Pokémon stats',    desc:'Base stats by name',           fields:[{id:'name',label:'Pokémon name',ph:'e.g. zangoose'}] },
+  { id:'moves',      icon:'⚔️', name:'Moves',            desc:'All learnable moves',           fields:[{id:'name',label:'Pokémon name',ph:'e.g. pikachu'}] },
+  { id:'abilities',  icon:'✨', name:'Abilities',         desc:'All abilities + hidden',        fields:[{id:'name',label:'Pokémon name',ph:'e.g. gengar'}] },
+  { id:'evolution',  icon:'🔄', name:'Evolution chain',  desc:'Full evolution line',           fields:[{id:'name',label:'Pokémon name',ph:'e.g. eevee'}] },
+  { id:'encounters', icon:'🗺️', name:'Encounters',       desc:'Where to find it',              fields:[{id:'name',label:'Pokémon name',ph:'e.g. snorlax'}] },
+  { id:'compare',    icon:'⚖️', name:'Compare',          desc:'Side-by-side stats',            fields:[{id:'name1',label:'First Pokémon',ph:'e.g. pikachu'},{id:'name2',label:'Second Pokémon',ph:'e.g. raichu'}] },
+  { id:'type',       icon:'🛡️', name:'Type matchups',    desc:'Strengths & weaknesses',        fields:[{id:'type',label:'Type',ph:'e.g. fire'}] },
+  { id:'move',       icon:'💥', name:'Move details',     desc:'Power, accuracy, effect',       fields:[{id:'move',label:'Move name',ph:'e.g. thunderbolt'}] },
+  { id:'ability',    icon:'🌟', name:'Ability details',  desc:'Effect description',            fields:[{id:'ability',label:'Ability name',ph:'e.g. intimidate'}] },
+  { id:'item',       icon:'🎒', name:'Item details',     desc:'In-game item info',             fields:[{id:'item',label:'Item name',ph:'e.g. master-ball'}] },
+  { id:'nature',     icon:'🧬', name:'Nature details',   desc:'Stat boosts & drops',           fields:[{id:'nature',label:'Nature name',ph:'e.g. adamant'}] },
+  { id:'generation', icon:'🗂️', name:'Generation list',  desc:'All Pokémon by gen',            fields:[{id:'gen',label:'Generation (1–9)',ph:'e.g. 4',type:'number'}] },
+];
+
+let activeTool = null;
+
+// Build tool system prompts
+const SYSTEM = `You are a Pokémon data assistant with access to the PokéAPI. Answer ONLY in JSON, no markdown, no explanation.
+
+When asked about a Pokémon's stats, return:
+{"type":"stats","name":"...","number":N,"types":["..."],"height":"...","weight":"...","stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}}
+
+When asked about moves for a Pokémon, return:
+{"type":"moves","name":"...","moves":["move1","move2",...]}
+
+When asked about abilities, return:
+{"type":"abilities","name":"...","abilities":[{"name":"...","hidden":false},...]}
+
+When asked about evolution chain, return:
+{"type":"evolution","chain":["mon1","mon2","mon3"]}
+
+When asked about encounters/locations, return:
+{"type":"encounters","name":"...","encounters":[{"location":"...","version":"..."},...]}
+
+When asked to compare two Pokémon, return:
+{"type":"compare","p1":{"name":"...","types":["..."],"stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}},"p2":{"name":"...","types":["..."],"stats":{"hp":N,"attack":N,"defense":N,"sp_attack":N,"sp_defense":N,"speed":N}}}
+
+When asked about type matchups, return:
+{"type":"type_matchups","type_name":"...","double_damage_to":["..."],"half_damage_to":["..."],"no_damage_to":["..."],"double_damage_from":["..."],"half_damage_from":["..."],"no_damage_from":["..."]}
+
+When asked about move details, return:
+{"type":"move","name":"...","move_type":"...","class":"physical|special|status","power":N_or_null,"accuracy":N_or_null,"pp":N,"effect":"..."}
+
+When asked about an ability, return:
+{"type":"ability","name":"...","effect":"...","short_effect":"..."}
+
+When asked about an item, return:
+{"type":"item","name":"...","category":"...","effect":"...","cost":N}
+
+When asked about a nature, return:
+{"type":"nature","name":"...","increases":"...","decreases":"..."}
+
+When asked about Pokémon in a generation, return:
+{"type":"generation","generation":N,"region":"...","pokemon":["mon1","mon2",...]}
+
+Use real Pokémon data. Return ONLY valid JSON.`;
+
+function buildPrompt(tool, vals) {
+  const t = tool.id;
+  if(t==='stats') return `Get base stats for Pokémon: ${vals.name}`;
+  if(t==='moves') return `List all moves for Pokémon: ${vals.name}`;
+  if(t==='abilities') return `List abilities (including hidden) for Pokémon: ${vals.name}`;
+  if(t==='evolution') return `Show evolution chain for Pokémon: ${vals.name}`;
+  if(t==='encounters') return `Show encounter locations for Pokémon: ${vals.name}`;
+  if(t==='compare') return `Compare base stats of ${vals.name1} and ${vals.name2}`;
+  if(t==='type') return `Show type matchups for type: ${vals.type}`;
+  if(t==='move') return `Get details for move: ${vals.move}`;
+  if(t==='ability') return `Get details for ability: ${vals.ability}`;
+  if(t==='item') return `Get details for item: ${vals.item}`;
+  if(t==='nature') return `Get details for nature: ${vals.nature}`;
+  if(t==='generation') return `List all Pokémon in generation ${vals.gen}`;
+}
+
+function saveKey() {
+  const k = document.getElementById('apiKey').value.trim();
+  if(k) { sessionStorage.setItem('poke_api_key', k); document.getElementById('keyNotice').classList.add('visible'); setTimeout(()=>document.getElementById('keyNotice').classList.remove('visible'),2500); }
+}
+
+function getKey() {
+  return document.getElementById('apiKey').value.trim() || sessionStorage.getItem('poke_api_key') || '';
+}
+
+function renderTools() {
+  document.getElementById('toolGrid').innerHTML = tools.map(t=>`
+    <div class="tool-card" id="card-${t.id}" onclick="selectTool('${t.id}')">
+      <div class="t-icon">${t.icon}</div>
+      <div class="t-name">${t.name}</div>
+      <div class="t-desc">${t.desc}</div>
+    </div>`).join('');
+}
+
+function selectTool(id) {
+  activeTool = tools.find(t=>t.id===id);
+  document.querySelectorAll('.tool-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('card-'+id).classList.add('active');
+  document.getElementById('panelIcon').textContent = activeTool.icon;
+  document.getElementById('panelTitle').textContent = activeTool.name;
+  document.getElementById('fieldsRow').innerHTML = activeTool.fields.map(f=>`
+    <div class="field-group">
+      <label>${f.label}</label>
+      <input type="${f.type||'text'}" id="f-${f.id}" placeholder="${f.ph}" onkeydown="if(event.key==='Enter')runTool()" />
+    </div>`).join('')+`<button class="run-btn" id="runBtn" onclick="runTool()">Run →</button>`;
+  document.getElementById('inputPanel').classList.add('visible');
+  document.getElementById('resultPanel').classList.remove('visible');
+  setTimeout(()=>document.getElementById('f-'+activeTool.fields[0].id).focus(),50);
+}
+
+async function runTool() {
+  if(!activeTool) return;
+  const key = getKey();
+  if(!key) { alert('Please enter your Anthropic API key first.'); return; }
+  const vals = {};
+  activeTool.fields.forEach(f=>{ vals[f.id]=document.getElementById('f-'+f.id).value.trim(); });
+  const prompt = buildPrompt(activeTool, vals);
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'Loading...';
+  const rp = document.getElementById('resultPanel');
+  const ri = document.getElementById('resultInner');
+  rp.classList.add('visible');
+  ri.innerHTML = '<span class="spinner"></span>Fetching data...';
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-api-key':key, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({ model:'claude-haiku-4-5-20251001', max_tokens:2000, system:SYSTEM, messages:[{role:'user',content:prompt}] })
+    });
+    const data = await res.json();
+    if(!res.ok) throw new Error(data.error?.message||'API error');
+    const text = data.content.map(b=>b.text||'').join('');
+    const json = JSON.parse(text.replace(/```json|```/g,'').trim());
+    ri.innerHTML = renderResult(json);
+  } catch(e) {
+    ri.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+  }
+  btn.disabled=false; btn.textContent='Run →';
+  document.getElementById('resultHead').textContent = activeTool.icon+' '+activeTool.name+' — result';
+}
+
+function typeBadge(t) {
+  return `<span class="type-badge t-${(t||'').toLowerCase()}">${t}</span>`;
+}
+
+function statColor(v) {
+  if(v>=100) return '#e8ff47';
+  if(v>=70) return '#47c9ff';
+  if(v>=50) return '#4caf50';
+  return '#ff6b47';
+}
+
+function statBars(stats) {
+  const keys = [{k:'hp',l:'HP'},{k:'attack',l:'Attack'},{k:'defense',l:'Defense'},{k:'sp_attack',l:'Sp. Atk'},{k:'sp_defense',l:'Sp. Def'},{k:'speed',l:'Speed'}];
+  return keys.map(({k,l})=>{
+    const v = stats[k]||0;
+    return `<div class="stat-row">
+      <span class="stat-lbl">${l}</span>
+      <div class="stat-bar-bg"><div class="stat-fill" style="width:${Math.min(100,(v/255)*100)}%;background:${statColor(v)}"></div></div>
+      <span class="stat-val">${v}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderResult(d) {
+  if(d.type==='stats') {
+    return `<div class="poke-header">
+      <div>
+        <div class="poke-num">#${String(d.number||'?').padStart(3,'0')}</div>
+        <div class="poke-name">${d.name}</div>
+        <div class="poke-meta">${d.height} · ${d.weight}</div>
+      </div>
+    </div>
+    <div class="types">${(d.types||[]).map(typeBadge).join('')}</div>
+    <div class="section-title">Base stats</div>
+    <div class="stat-rows">${statBars(d.stats)}</div>`;
+  }
+  if(d.type==='moves') {
+    return `<div class="poke-name" style="margin-bottom:0.75rem;font-size:16px;text-transform:capitalize">${d.name} — ${d.moves.length} moves</div>
+    <div class="move-grid">${d.moves.map(m=>`<div class="move-item">${m}</div>`).join('')}</div>`;
+  }
+  if(d.type==='abilities') {
+    return `<div class="poke-name" style="margin-bottom:0.75rem;font-size:16px;text-transform:capitalize">${d.name}</div>
+    <div class="tag-cloud">${d.abilities.map(a=>`<span class="tag ${a.hidden?'hidden':'ability'}">${a.name}${a.hidden?' (hidden)':''}</span>`).join('')}</div>`;
+  }
+  if(d.type==='evolution') {
+    return `<div class="section-title">Evolution chain</div>
+    <div class="evo-chain">${d.chain.map((m,i)=>`${i>0?'<span class="evo-arrow">→</span>':''}<span class="evo-mon">${m}</span>`).join('')}</div>`;
+  }
+  if(d.type==='encounters') {
+    if(!d.encounters||!d.encounters.length) return `<div class="muted" style="color:var(--muted)">No wild encounter data found for ${d.name}.</div>`;
+    return `<div class="poke-name" style="margin-bottom:0.75rem;font-size:16px;text-transform:capitalize">${d.name} encounters</div>
+    ${d.encounters.slice(0,20).map(e=>`<div class="enc-item"><span class="enc-loc">${e.location}</span><span class="enc-ver">${e.version}</span></div>`).join('')}`;
+  }
+  if(d.type==='compare') {
+    const p1=d.p1, p2=d.p2;
+    const keys=['hp','attack','defense','sp_attack','sp_defense','speed'];
+    const labels=['HP','ATK','DEF','SP.ATK','SP.DEF','SPD'];
+    return `<div class="compare-grid">
+      <div>
+        <div class="compare-name">${p1.name}</div>
+        <div class="types" style="margin-bottom:8px">${(p1.types||[]).map(typeBadge).join('')}</div>
+        ${statBars(p1.stats)}
+      </div>
+      <div>
+        <div class="compare-name">${p2.name}</div>
+        <div class="types" style="margin-bottom:8px">${(p2.types||[]).map(typeBadge).join('')}</div>
+        ${statBars(p2.stats)}
+      </div>
+    </div>`;
+  }
+  if(d.type==='type_matchups') {
+    const sec = (label,arr,color)=> arr&&arr.length ? `<div class="matchup-row"><div class="matchup-label">${label}</div><div class="tag-cloud">${arr.map(t=>`<span class="tag" style="color:${color};border-color:${color}33;background:${color}11">${t}</span>`).join('')}</div></div>`:''
+    return `<div class="poke-name" style="margin-bottom:1rem;font-size:16px">${typeBadge(d.type_name)} type matchups</div>
+    ${sec('Strong against (2×)',d.double_damage_to,'#e8ff47')}
+    ${sec('Weak against (2×)',d.double_damage_from,'#ff6b47')}
+    ${sec('Resists (½×)',d.half_damage_from,'#47c9ff')}
+    ${sec('Not very effective (½×)',d.half_damage_to,'#7a7a8a')}
+    ${sec('Immune to',d.no_damage_from,'#9c27b0')}
+    ${sec('No effect on',d.no_damage_to,'#7a7a8a')}`;
+  }
+  if(d.type==='move') {
+    return `<div class="poke-name" style="margin-bottom:1rem;font-size:18px;text-transform:capitalize">${d.name}</div>
+    <div class="info-grid" style="margin-bottom:1rem">
+      <div class="info-row"><span class="info-lbl">Type</span><span class="info-val">${typeBadge(d.move_type)}</span></div>
+      <div class="info-row"><span class="info-lbl">Class</span><span class="info-val">${d.class||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Power</span><span class="info-val">${d.power||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Accuracy</span><span class="info-val">${d.accuracy!=null?d.accuracy+'%':'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">PP</span><span class="info-val">${d.pp||'—'}</span></div>
+    </div>
+    <div class="section-title">Effect</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7">${d.effect||d.short_effect||'—'}</div>`;
+  }
+  if(d.type==='ability') {
+    return `<div class="poke-name" style="margin-bottom:0.5rem;font-size:18px;text-transform:capitalize">${d.name}</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7">${d.effect||d.short_effect||'—'}</div>`;
+  }
+  if(d.type==='item') {
+    return `<div class="poke-name" style="margin-bottom:0.5rem;font-size:18px;text-transform:capitalize">${d.name}</div>
+    <div class="info-grid" style="margin-bottom:1rem">
+      <div class="info-row"><span class="info-lbl">Category</span><span class="info-val">${d.category||'—'}</span></div>
+      <div class="info-row"><span class="info-lbl">Cost</span><span class="info-val">${d.cost!=null?'₽'+d.cost:'—'}</span></div>
+    </div>
+    <div class="section-title">Effect</div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7">${d.effect||'—'}</div>`;
+  }
+  if(d.type==='nature') {
+    return `<div class="poke-name" style="margin-bottom:1rem;font-size:18px;text-transform:capitalize">${d.name}</div>
+    <div class="info-grid">
+      <div class="info-row"><span class="info-lbl">Increases</span><span class="info-val" style="color:#e8ff47">${d.increases||'None'}</span></div>
+      <div class="info-row"><span class="info-lbl">Decreases</span><span class="info-val" style="color:#ff6b47">${d.decreases||'None'}</span></div>
+    </div>`;
+  }
+  if(d.type==='generation') {
+    return `<div class="poke-name" style="margin-bottom:0.25rem;font-size:16px">Generation ${d.generation} — ${d.region}</div>
+    <div style="color:var(--muted);font-size:12px;margin-bottom:0.75rem">${d.pokemon.length} Pokémon</div>
+    <div class="gen-grid">${d.pokemon.map(p=>`<div class="gen-item">${p}</div>`).join('')}</div>`;
+  }
+  return `<pre style="font-size:12px;color:var(--muted);white-space:pre-wrap">${JSON.stringify(d,null,2)}</pre>`;
+}
+
+renderTools();
+
+// restore key
+const saved = sessionStorage.getItem('poke_api_key');
+if(saved) document.getElementById('apiKey').value = saved;
+</script>
+</body>
+</html>
